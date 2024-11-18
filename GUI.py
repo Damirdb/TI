@@ -38,8 +38,7 @@ def calculate():
             if p_B_given_A.shape != (n_A, d):
                 raise ValueError(f"Ошибка: размеры p(B|A) должны быть ({n_A}, {d}).")
 
-            H_A, H_B, H_AB, H_A_given_B, H_B_given_A, I_AB, p_joint, p_A_given_B, p_B_given_A = \
-                calc_entropies(p_A=p_A, p_B_given_A=p_B_given_A)
+            results = calc_entropies(p_A=p_A, p_B_given_A=p_B_given_A)
 
         elif method_var.get() == 2:  # Метод 2: заданы p(B) и p(A|B)
             p_B = np.array([float(entry.get()) for entry in entry_B])
@@ -51,8 +50,7 @@ def calculate():
             if p_A_given_B.shape != (d, n_A):
                 raise ValueError(f"Ошибка: размеры p(A|B) должны быть ({d}, {n_A}).")
 
-            H_A, H_B, H_AB, H_A_given_B, H_B_given_A, I_AB, p_joint, p_A_given_B, p_B_given_A = \
-                calc_entropies(p_B=p_B, p_A_given_B=p_A_given_B)
+            results = calc_entropies(p_B=p_B, p_A_given_B=p_A_given_B)
 
         elif method_var.get() == 3:  # Метод 3: задана совместная вероятность p(A,B)
             p_joint = np.array([[float(entry.get()) for entry in entry_joint[i:i+d]] 
@@ -61,20 +59,10 @@ def calculate():
             if p_joint.shape != (n_A, d):
                 raise ValueError(f"Ошибка: размеры p(A,B) должны быть ({n_A}, {d}).")
 
-            # Расчет p(B)
-            p_B = np.sum(p_joint, axis=0)  # Суммируем по строкам для получения p(B)
+            results = calc_entropies(p_joint=p_joint)
 
-            # Расчет p(A|B)
-            p_A_given_B = p_joint / p_B  # Делим элементы p(A,B) на p(B)
-
-            # Расчет p(A)
-            p_A = np.sum(p_joint, axis=1)  # Суммируем по столбцам для получения p(A)
-
-            # Расчет p(B|A)
-            p_B_given_A = p_joint / p_A[:, np.newaxis]  # Делим элементы p(A,B) на p(A)
-
-            H_A, H_B, H_AB, H_A_given_B, H_B_given_A, I_AB, p_joint, p_A_given_B, p_B_given_A = \
-                calc_entropies(p_joint=p_joint)
+        # Распаковываем результаты
+        H_A, H_B, H_AB, H_A_given_B, H_B_given_A, I_AB, p_joint, p_A, p_B, p_A_given_B, p_B_given_A = results
 
         # Создаем окно результатов
         result_window = tk.Toplevel(root)
@@ -97,8 +85,6 @@ def calculate():
 
     except Exception as e:
         messagebox.showerror("Ошибка", f"Ошибка при расчете: {e}")
-
-# Остальная часть GUI остается без изменений
 
 
 def confirm_values():
