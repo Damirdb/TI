@@ -1,0 +1,259 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import numpy as np
+
+# Функции для расчетов
+def shannon_entropy(prob_dist):
+    """Вычисляет энтропию Шеннона для заданного распределения вероятностей."""
+    return -np.sum(prob_dist * np.log2(prob_dist, where=(prob_dist > 0)))
+
+def conditional_entropy(p_cond, p_source):
+    """Функция для расчета условной энтропии H(A|B) или H(B|A)"""
+    if p_cond.shape[1] != p_source.shape[0]:
+        p_source = p_source[:, np.newaxis]  # Преобразуем в нужную форму, если это необходимо
+    joint_prob = p_cond * p_source  # Совместные вероятности P(A, B)
+    cond_entropy = -np.nansum(joint_prob * np.log2(p_cond, where=(p_cond > 0)), axis=0)
+    return np.sum(cond_entropy)
+
+def joint_entropy(p_joint):
+    """Расчет совместной энтропии H(A, B)"""
+    return -np.nansum(p_joint * np.log2(p_joint, where=(p_joint > 0)))
+
+def mutual_information(H_A, H_B, H_AB):
+    """Расчет взаимной информации I(A; B)"""
+    return H_A + H_B - H_AB
+
+def reverse_channel(p_joint, p_B):
+    """Вычисляет обратную канальную матрицу p(ai|bj)."""
+    return p_joint.T / p_B[:, np.newaxis]
+
+# Вариант 1: Заданы P(A) и P(B|A)
+def variant_1(p_b_given_a, p_A):
+    p_A = p_A[:, np.newaxis]  # Преобразуем P(A) в колонку (n, 1)
+    p_joint = p_b_given_a * p_A  # Совместная вероятность P(A, B)
+    
+    p_B = np.sum(p_joint, axis=0)  # Маргинальное распределение P(B)
+    p_a_given_b = reverse_channel(p_joint, p_B)  # P(A|B)
+
+    H_A = shannon_entropy(p_A)
+    H_B = shannon_entropy(p_B)
+    H_B_given_A = conditional_entropy(p_b_given_a, p_A)
+    H_A_given_B = conditional_entropy(p_a_given_b.T, p_B)
+
+    H_AB = joint_entropy(p_joint)
+    I_AB = mutual_information(H_A, H_B, H_AB)
+
+    return {
+        "P(B)": np.round(p_B, 4),
+        "P(A, B)": np.round(p_joint, 4),
+        "P(A|B)": np.round(p_a_given_b, 4),
+        "H(A)": np.round(H_A, 4),
+        "H(B)": np.round(H_B, 4),
+        "H(A|B)": np.round(H_A_given_B, 4),
+        "H(B|A)": np.round(H_B_given_A, 4),
+        "H(A,B)": np.round(H_AB, 4),
+        "I(A;B)": np.round(I_AB, 4),
+    }
+
+# Вариант 2: Заданы P(B) и P(A|B)
+def variant_2(p_a_given_b, p_B):
+    p_B = p_B[:, np.newaxis]  # Преобразуем P(B) в колонку (m, 1)
+    p_joint = p_a_given_b * p_B.T  # Совместная вероятность P(A, B)
+    
+    p_A = np.sum(p_joint, axis=1)  # Маргинальное распределение P(A)
+    p_b_given_a = reverse_channel(p_joint.T, p_A)  # P(B|A)
+
+    H_A = shannon_entropy(p_A)
+    H_B = shannon_entropy(p_B)
+    H_A_given_B = conditional_entropy(p_a_given_b.T, p_B)
+    H_B_given_A = conditional_entropy(p_b_given_a, p_A)
+
+    H_AB = joint_entropy(p_joint)
+    I_AB = mutual_information(H_A, H_B, H_AB)
+
+    return {
+        "P(A)": np.round(p_A, 4),
+        "P(A, B)": np.round(p_joint, 4),
+        "P(B|A)": np.round(p_b_given_a, 4),
+        "H(A)": np.round(H_A, 4),
+        "H(B)": np.round(H_B, 4),
+        "H(A|B)": np.round(H_A_given_B, 4),
+        "H(B|A)": np.round(H_B_given_A, 4),
+        "H(A,B)": np.round(H_AB, 4),
+        "I(A;B)": np.round(I_AB, 4),
+    }
+
+# Вариант 3: Задана совместная матрица P(A, B)
+def variant_3(p_joint):
+    p_A = np.sum(p_joint, axis=1)  # Маргинальные вероятности P(A)
+    p_B = np.sum(p_joint, axis=0)  # Маргинальные вероятности P(B)
+
+    H_A = shannon_entropy(p_A)
+    H_B = shannon_entropy(p_B)
+    H_AB = joint_entropy(p_joint)
+    H_B_given_A = conditional_entropy(p_joint.T, p_A)
+    H_A_given_B = conditional_entropy(p_joint, p_B)
+    I_AB = mutual_information(H_A, H_B, H_AB)
+
+    return {
+        "P(A)": np.round(p_A, 4),
+        "P(B)": np.round(p_B, 4),
+        "H(A)": np.round(H_A, 4),
+        "H(B)": np.round(H_B, 4),
+        "H(A|B)": np.round(H_A_given_B, 4),
+        "H(B|A)": np.round(H_B_given_A, 4),
+        "H(A,B)": np.round(H_AB, 4),
+        "I(A;B)": np.round(I_AB, 4),
+    }
+
+# GUI Функции
+def open_matrix_input_window():
+    try:
+        rows = int(row_entry.get())
+        cols = int(col_entry.get())
+        if rows <= 0 or cols <= 0:
+            raise ValueError("Количество строк и столбцов должно быть больше нуля.")
+    except ValueError:
+        messagebox.showerror("Ошибка", "Введите корректные размеры матрицы (положительные целые числа).")
+        return
+
+    selected_option = variant_var.get()
+    if not selected_option:
+        messagebox.showerror("Ошибка", "Выберите вариант!")
+        return
+
+    # Открываем окно для ввода данных
+    input_window = tk.Toplevel(root)
+    input_window.title("Ввод данных матрицы")
+
+    if selected_option == "1":
+        # Вариант 1: Ввод P(A) и P(B|A)
+        tk.Label(input_window, text="Введите вероятности P(A):").pack(pady=5)
+        p_a_entries = []
+        for i in range(rows):
+            entry = ttk.Entry(input_window, width=10)
+            entry.pack()
+            p_a_entries.append(entry)
+
+        tk.Label(input_window, text="Введите матрицу P(B|A):").pack(pady=5)
+        p_b_given_a_entries = []
+        for i in range(rows):
+            row_entries = []
+            frame = tk.Frame(input_window)
+            frame.pack()
+            for j in range(cols):
+                entry = ttk.Entry(frame, width=10)
+                entry.grid(row=i, column=j)
+                row_entries.append(entry)
+            p_b_given_a_entries.append(row_entries)
+
+        def process_variant_1():
+            try:
+                p_A = np.array([float(entry.get()) for entry in p_a_entries])
+                p_B_given_A = np.array([[float(entry.get()) for entry in row] for row in p_b_given_a_entries])
+                
+                # Проверяем размеры массивов
+                if p_A.shape[0] != p_B_given_A.shape[0]:
+                    raise ValueError("Количество элементов в P(A) должно совпадать с количеством строк в P(B|A).")
+
+                results = variant_1(p_B_given_A, p_A)
+                show_results(results)
+            except ValueError as e:
+                messagebox.showerror("Ошибка", f"Неверный ввод данных: {e}")
+
+        ttk.Button(input_window, text="Вычислить", command=process_variant_1).pack(pady=10)
+
+    elif selected_option == "2":
+        # Вариант 2: Ввод P(B) и P(A|B)
+        tk.Label(input_window, text="Введите вероятности P(B):").pack(pady=5)
+        p_b_entries = []
+        for i in range(cols):
+            entry = ttk.Entry(input_window, width=10)
+            entry.pack()
+            p_b_entries.append(entry)
+
+        tk.Label(input_window, text="Введите матрицу P(A|B):").pack(pady=5)
+        p_a_given_b_entries = []
+        for i in range(rows):
+            row_entries = []
+            frame = tk.Frame(input_window)
+            frame.pack()
+            for j in range(cols):
+                entry = ttk.Entry(frame, width=10)
+                entry.grid(row=i, column=j)
+                row_entries.append(entry)
+            p_a_given_b_entries.append(row_entries)
+
+        def process_variant_2():
+            try:
+                p_B = np.array([float(entry.get()) for entry in p_b_entries])
+                p_A_given_B = np.array([[float(entry.get()) for entry in row] for row in p_a_given_b_entries])
+
+                # Проверяем размеры
+                if p_B.shape[0] != p_A_given_B.shape[1]:
+                    raise ValueError("Количество элементов в P(B) должно совпадать с количеством столбцов в P(A|B).")
+
+                results = variant_2(p_A_given_B, p_B)
+                show_results(results)
+            except ValueError as e:
+                messagebox.showerror("Ошибка", f"Неверный ввод данных: {e}")
+
+        ttk.Button(input_window, text="Вычислить", command=process_variant_2).pack(pady=10)
+
+    elif selected_option == "3":
+        # Вариант 3: Ввод матрицы P(A, B)
+        tk.Label(input_window, text="Введите матрицу P(A, B):").pack(pady=5)
+        p_ab_entries = []
+        for i in range(rows):
+            row_entries = []
+            frame = tk.Frame(input_window)
+            frame.pack()
+            for j in range(cols):
+                entry = ttk.Entry(frame, width=10)
+                entry.grid(row=i, column=j)
+                row_entries.append(entry)
+            p_ab_entries.append(row_entries)
+
+        def process_variant_3():
+            try:
+                p_AB = np.array([[float(entry.get()) for entry in row] for row in p_ab_entries])
+                results = variant_3(p_AB)
+                show_results(results)
+            except ValueError as e:
+                messagebox.showerror("Ошибка", f"Неверный ввод данных: {e}")
+
+        ttk.Button(input_window, text="Вычислить", command=process_variant_3).pack(pady=10)
+
+def show_results(results):
+    result_window = tk.Toplevel(root)
+    result_window.title("Результаты")
+
+    for key, value in results.items():
+        result_label = tk.Label(result_window, text=f"{key}: {value}")
+        result_label.pack()
+
+root = tk.Tk()
+root.title("Ввод данных для матрицы")
+
+# Выбор варианта
+variant_var = tk.StringVar()
+
+ttk.Radiobutton(root, text="Вариант 1 (P(A) и P(B|A))", variable=variant_var, value="1").pack(anchor=tk.W)
+ttk.Radiobutton(root, text="Вариант 2 (P(B) и P(A|B))", variable=variant_var, value="2").pack(anchor=tk.W)
+ttk.Radiobutton(root, text="Вариант 3 (P(A, B))", variable=variant_var, value="3").pack(anchor=tk.W)
+
+# Ввод размеров матрицы
+tk.Label(root, text="Введите размеры матрицы:").pack(pady=5)
+row_frame = tk.Frame(root)
+row_frame.pack(pady=5)
+tk.Label(row_frame, text="Строк:").pack(side=tk.LEFT)
+row_entry = ttk.Entry(row_frame, width=5)
+row_entry.pack(side=tk.LEFT, padx=5)
+tk.Label(row_frame, text="Столбцов:").pack(side=tk.LEFT)
+col_entry = ttk.Entry(row_frame, width=5)
+col_entry.pack(side=tk.LEFT, padx=5)
+
+# Кнопка для перехода к вводу данных
+ttk.Button(root, text="Ввести матрицу", command=open_matrix_input_window).pack(pady=20)
+
+root.mainloop()
