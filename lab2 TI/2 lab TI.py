@@ -73,7 +73,16 @@ def generate_huffman_codes(node, code="", codes=None):
 
 # Кодирование сообщения
 def encode_message(text, codes):
-    return ''.join(codes[char] for char in text)
+    encoded = []
+    missing_symbols = set()
+    for char in text:
+        if char in codes:
+            encoded.append(codes[char])
+        else:
+            missing_symbols.add(char)
+    if missing_symbols:
+        print(f"Предупреждение: символы {missing_symbols} отсутствуют в кодах.")
+    return ''.join(encoded)
 
 # Расчет энтропии
 def calculate_entropy(frequencies):
@@ -90,24 +99,25 @@ def calculate_redundancy(frequencies, codes, entropy):
 
 # Функция для обработки сообщения
 def process_text(input_text):
-    input_text = input_text.lower()
-    frequencies = calculate_frequencies(input_text)
+    # 1. Преобразуем весь текст в нижний регистр для кодирования
+    input_text_lower = input_text.lower()
 
-    # Shannon-Fano
+    # 2. Рассчитываем частоты символов на основе текста в нижнем регистре
+    frequencies = calculate_frequencies(input_text_lower)
+
+    # 3. Генерация кодов
     sf_codes = generate_shannon_fano(frequencies)
-
-    # Huffman
     huffman_tree = build_huffman_tree(frequencies)
     huffman_codes = generate_huffman_codes(huffman_tree)
 
-    # Metrics
+    # Метрики
     entropy = calculate_entropy(frequencies)
     avg_length_sf = calculate_average_length(frequencies, sf_codes)
     avg_length_huffman = calculate_average_length(frequencies, huffman_codes)
     redundancy_sf = calculate_redundancy(frequencies, sf_codes, entropy)
     redundancy_huffman = calculate_redundancy(frequencies, huffman_codes, entropy)
 
-    return frequencies, sf_codes, huffman_codes, entropy, avg_length_sf, avg_length_huffman, redundancy_sf, redundancy_huffman
+    return frequencies, sf_codes, huffman_codes, entropy, avg_length_sf, avg_length_huffman, redundancy_sf, redundancy_huffman, input_text_lower
 
 # Функция загрузки текста из файла
 def load_from_file():
@@ -124,6 +134,14 @@ def update_table(frequencies, sf_codes, huffman_codes):
     for char, (count, prob) in frequencies.items():
         results_table.insert("", "end", values=(char, f"{prob:.4f}", sf_codes.get(char, ""), huffman_codes.get(char, "")))
 
+# Обновление закодированных текстов
+def update_encoded_text(input_text, sf_codes, huffman_codes):
+    sf_encoded = encode_message(input_text, sf_codes)
+    huffman_encoded = encode_message(input_text, huffman_codes)
+
+    sf_encoded_label.config(text=f"Шеннон-Фано Кодированный текст: {sf_encoded}")
+    huffman_encoded_label.config(text=f"Хаффман Кодированный текст: {huffman_encoded}")
+
 # Функция расчета
 def calculate():
     input_text = input_field.get()
@@ -131,7 +149,7 @@ def calculate():
         return
 
     (frequencies, sf_codes, huffman_codes, entropy, avg_length_sf,
-     avg_length_huffman, redundancy_sf, redundancy_huffman) = process_text(input_text)
+     avg_length_huffman, redundancy_sf, redundancy_huffman, input_text_lower) = process_text(input_text)
 
     # Обновление таблицы
     update_table(frequencies, sf_codes, huffman_codes)
@@ -143,10 +161,13 @@ def calculate():
     sf_redundancy_label.config(text=f"D (ШФ): {redundancy_sf:.4f}")
     huffman_redundancy_label.config(text=f"D (Х): {redundancy_huffman:.4f}")
 
+    # Обновление закодированных текстов
+    update_encoded_text(input_text_lower, sf_codes, huffman_codes)
+
 # Создание окна
 root = tk.Tk()
 root.title("Шеннон-Фано и Хаффман Кодирование")
-root.geometry("1200x600")
+root.geometry("1200x700")
 
 # Верхняя панель
 top_frame = tk.Frame(root)
@@ -200,6 +221,16 @@ huffman_avg_label.pack(side="left", padx=10)
 
 huffman_redundancy_label = tk.Label(metrics_frame, text="D (Х): -", font=("Arial", 10))
 huffman_redundancy_label.pack(side="left", padx=10)
+
+# Закодированные тексты
+encoded_text_frame = tk.Frame(root)
+encoded_text_frame.pack(side="top", fill="x", padx=10, pady=10)
+
+sf_encoded_label = tk.Label(encoded_text_frame, text="Шеннон-Фано Кодированный текст: -", wraplength=1000, justify="left")
+sf_encoded_label.pack(side="top", fill="x", pady=5)
+
+huffman_encoded_label = tk.Label(encoded_text_frame, text="Хаффман Кодированный текст: -", wraplength=1000, justify="left")
+huffman_encoded_label.pack(side="top", fill="x", pady=5)
 
 # Запуск приложения
 root.mainloop()
